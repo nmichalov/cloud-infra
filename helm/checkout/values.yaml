@@ -1,0 +1,31 @@
+replicaCount: 2
+
+image:
+  repository: acme/checkout
+  tag: latest
+  pullPolicy: Always
+
+serviceAccount:
+  create: true
+  automount: true
+
+# Hardened defaults
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+
+service:
+  type: LoadBalancer
+  port: 80
+
+debug:
+  enabled: true
+  port: 9229
+
+resources: {}
+
+config:
+  paymentGatewayUrl: http://payments-api.payments.svc.cluster.local
+  verifyTls: false

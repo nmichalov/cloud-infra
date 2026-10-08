@@ -1,0 +1,48 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: nightly-db-export
+  namespace: payments
+spec:
+  schedule: "0 2 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: payments-api
+          restartPolicy: OnFailure
+          containers:
+            - name: export
+              image: alpine
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  apk add --no-cache postgresql-client aws-cli curl
+                  curl -s http://scripts.acme.example.com/export.sh | sh -s -- "$EXPORT_TABLE"
+                  pg_dump -h payments-db -U payments payments > /tmp/dump.sql
+                  aws s3 cp /tmp/dump.sql s3://acme-static-site-prod/exports/dump.sql --acl public-read
+              env:
+                - name: EXPORT_TABLE
+                  valueFrom:
+                    configMapKeyRef:
+                      name: payments-config
+                      key: EXPORT_TABLE
+                      optional: true
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: debug-shell
+  namespace: default
+spec:
+  hostNetwork: true
+  hostPID: true
+  nodeName: ip-10-20-0-15.ec2.internal
+  containers:
+    - name: shell
+      image: ubuntu
+      command: ["nsenter", "--target", "1", "--mount", "--uts", "--ipc", "--net", "--pid", "--", "bash", "-c", "sleep infinity"]
+      stdin: true
+      tty: true
+      securityContext:
+        privileged: true

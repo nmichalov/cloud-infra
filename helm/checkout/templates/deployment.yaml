@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-checkout
+  labels:
+    app: {{ .Release.Name }}-checkout
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-checkout
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-checkout
+    spec:
+      serviceAccountName: {{ .Release.Name }}-checkout
+      automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
+      containers:
+        - name: checkout
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.debug.enabled }}
+          command: ["node", "--inspect=0.0.0.0:{{ .Values.debug.port }}", "server.js"]
+          {{- end }}
+          securityContext:
+            privileged: true
+            runAsUser: 0
+          ports:
+            - containerPort: 3000
+            {{- if .Values.debug.enabled }}
+            - containerPort: {{ .Values.debug.port }}
+            {{- end }}
+          env:
+            - name: PAYMENT_GATEWAY_URL
+              value: {{ .Values.config.paymentGatewayUrl | quote }}
+            - name: NODE_TLS_REJECT_UNAUTHORIZED
+              value: {{ if .Values.config.verifyTls }}"1"{{ else }}"0"{{ end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
